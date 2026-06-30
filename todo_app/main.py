@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException,Query
 from pydantic import BaseModel,Field, field_validator,model_validator
 from typing import Optional
 from enum import Enum
@@ -105,9 +105,9 @@ id_count=0
 # ==========================================
 def find_todo(todo_id:int):
     for todo in fake_db:
-        if todo[id]==todo_id:
+        if todo["id"]==todo_id:
             return todo
-        return None
+    return None
 
 # ==========================================
 # ROUTES
@@ -121,7 +121,7 @@ def home():
 @app.post("/todos", status_code=201)
 def create_todo(todo:TodoCreate):
     global id_count
-    id_count=1
+    id_count+=1
 
     new_todo={
         "id": id_count,
@@ -143,7 +143,7 @@ def getTodos():
 def search_todo(
     status:Optional[Status]=None,
     priority:Optional[Priority]=None,
-    limit: int=Field(default=10,gt=0,le=100)
+    limit: int=Query(default=10,gt=0,le=100)
 ):
     results=fake_db
 
