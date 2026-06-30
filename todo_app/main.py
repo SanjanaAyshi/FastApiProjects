@@ -1,118 +1,95 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel,Field, field_validator,model_validator
 from typing import Optional
-app=FastAPI(
-    title="ToDo Api",
-    description="A simple Todo API build with fastApi",
+from enum import Enum
+from datetime import datetime
+
+app= FastAPI(
+    title="todo Api",
     version="1.0.0"
 )
-# For CREATING a todo (what client sends)
+
+# ==========================================
+# ENUMS
+# ==========================================
+
+class Priority(str,Enum):
+    low="low"
+    medium="medium"
+    high="high"
+
+class Status(str,Enum):
+    pending="pending"
+    in_process="in_Process"
+    completed="completed"
+
+# ==========================================
+# PYDANTIC MODELS
+# ==========================================
+
 class TodoCreate(BaseModel):
-    title: str
-    description: Optional[str]=None
-    completed: bool=False
-    priority: str ="medium"
+    title: str=Field(
+        ...,
+        min_length=3,
+        max_length=100,
+        description="Title here"
+    )
+    description: Optional[str]=Field(
+        None,
+        max_length=500,
+        description="Todo Details here"
+    )
+    priority:Priority=Field(
+        default=Priority.medium,
+        description="Set priority level"
+    )
+    status:Status=Field(
+        default=Status.pending,
+        description="Set current Status"
+    )
 
-# For UPDATING a todo (all fields optional)
+
+    @field_validator('title')
+    @classmethod
+    def titleMustNotBeEmpty(cls,v):
+        if v.strip()==" ":
+            raise HTTPException("Title Cant be just space")
+        return v.strip()
+
+    @field_validator("title")
+    @classmethod
+    def titleMustStartWithCapital(cls,v):
+        if v[0].islower():
+            return v.capitalize()
+        return v
+
+
+    @model_validator(mode='after')
+    def checkCompletedPriority(self):
+        if self.status==Status.completed and self.priority== Priority.high:
+            raise ValueError("Completed status cant have higher priority"
+            )
+        return self
+
 class TodoUpdate(BaseModel):
-    title: Optional[str] = None
+    title:Optional[str]=Field(None,min_length=3,max_length=100)
+    description:Optional[str]=Field(None,max_length=500)
+    priority:Optional[str]=None
+    status:Optional[str]=None
+
+    @field_validator('title')
+    @classmethod
+    def titleMustNotBeEmptySpace(cls,v):
+        if v is not None and v.strip()=='':
+            raise ValueError ('title Cannot be just spaces')
+        if  v is not None:
+            return v.strip()
+        return v
+
+class TodoResponse(BaseModel):
+    id:int
+    title:str
     description: Optional[str]=None
-    completed: Optional[bool]=False
-    priority: Optional[str] ="medium"
-
-# ==========================================
-# FAKE DATABASE (list for now)
-# ==========================================
-fake_db=[]
-id_count=0
-
-# ==========================================
-# HELPER FUNCTION
-# ==========================================
-def find_todo(todo_id: int):
-    for todo in fake_db:
-        if todo["id"] == todo_id:
-            return todo
-    return None
-# ==========================================
-# ROUTES / ENDPOINTS
-# ==========================================
-@app.get("/")
-def home():
-    return {"message": "Welcome to Todo API"}
-
-# CREATE a todo (POST)
-@app.post("/todos",status_code=201)
-def create_todo(todo: TodoCreate):
-    global id_count
-    id_count +=1
-
-    new_todo={
-        "id" : id_count,
-        "title" : todo.title,
-        "description": todo.description,
-        "completed": todo.completed,
-        "priority": todo.priority
-        }
-    fake_db.append(new_todo)
-
-    return{
-        "message": "Todo is created successfully!",
-        "todo": new_todo
-    }
-
-# READ all todos (GET)
-
-# READ all todos (GET)
-@app.get("/todos")
-def get_all_todos():
-    return {
-        "total": len(fake_db),
-        "todos": fake_db
-    }
-
-# READ single todo (GET)
-@app.get("/todos/{todo_id}")
-def get_todo(todo_id: int):
-    todo = find_todo(todo_id)
-
-    if todo is None:
-        raise HTTPException(status_code=404, detail="Todo not found")
-
-    return {"todo": todo}
-
-# UPDATE a todo (PUT)
-@app.put("/todos/{todo_id}")
-def update_todo(todo_id:int, todo_data: TodoUpdate):
-    todo=find_todo(todo_id)
-
-    if todo is None:
-        raise HTTPException(status_code=404, detail="Todo not found..")
-    
-    if todo_data.title is not None:
-        todo["title"]= todo_data.title
-    
-    if todo_data.description is not None:
-        todo['description']=todo_data.description
-    
-    if todo_data.completed is not None:
-        todo['complete'] =todo_data.completed
-
-    if todo_data.priority is not None:
-        todo['priority']= todo_data.priority
-    
-    return{
-        "message": "Todo updated Successfully!!",
-        "todo": todo
-    }
-# DELETE a todo (DELETE)
-@app.delete("/todos/{todo_id}")
-def delete_todo(todo_id: int):
-    todo = find_todo(todo_id)
-
-    if todo is None:
-        raise HTTPException(status_code=404, detail="Todo not found")
-
-    fake_db.remove(todo)
-
-    return {"message": f"Todo '{todo['title']}' deleted successfully!"}
+    priority:Priority
+    status:Status
+    created_at:str
