@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException,Query
+from fastapi import FastAPI, HTTPException,Query, Depends
 from pydantic import BaseModel,Field, field_validator,model_validator
 from typing import Optional
 from enum import Enum
@@ -110,6 +110,17 @@ def find_todo(todo_id:int):
     return None
 
 # ==========================================
+# DEPENDENCIES
+# ==========================================
+
+def get_todo_or_404(todo_id: int):
+    """Find a todo by ID or raise 404 error"""
+    todo = find_todo(todo_id)
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return todo
+
+# ==========================================
 # ROUTES
 # ==========================================
 @app.get("/")
@@ -161,38 +172,26 @@ def search_todo(
         "todos":results
     }
 
+# ─── These 3 routes now use Dependency Injection ───
+
 @app.get("/todos/{todo_id}")
-def get_todo(todo_id:int):
-    todo=find_todo(todo_id)
-    if todo is None:
-        raise HTTPException(status_code=404,detail="todo not found")
+def get_todo(todo:dict=Depends(get_todo_or_404)):
     return{"todo":todo}
 
 @app.put("/todos/{todo_id}")
-def update_todo(todo_id:int, todo_date:TodoUpdate):
-    todo=find_todo(todo_id)
-    if todo is None:
-        raise HTTPException(status_code=404, detail="todo is not found")
+def update_todo(todo_data: TodoUpdate,todo:dict=Depends(get_todo_or_404)):
+    if todo_data.title is not None:
+        todo["title"]=todo_data.title
+    if todo_data.description is not None:
+        todo['description'] = todo_data.description
+    if todo_data.priority is not None:
+        todo["priority"]=todo_data.priority
+    if todo_data.status is not None:
+        todo["status"]=todo_data.status
     
-    if todo_date.title is not None:
-        todo["title"]= todo_date.title
-    if todo_date.description is not None:
-        todo['description']=todo_date.description
-    if todo_date.priority is not None:
-        todo['priority']=todo_date.priority
-    if todo_date.status is not None:
-        todo["status"]=todo_date.status
-    
-    return {
-        "message": "todo updated Successfully!!",
-        "todo":todo
-    }
-
+    return{"message": "todo updates successfully!!","todo": todo}
 
 @app.delete("/todos/{todo_id}")
-def delete_todo(todo_id: int):
-    todo = find_todo(todo_id)
-    if todo is None:
-        raise HTTPException(status_code=404, detail="Todo not found")
+def delete_todo(todo: dict=Depends(get_todo_or_404)):
     fake_db.remove(todo)
     return {"message": f"Todo '{todo['title']}' deleted successfully!"}
