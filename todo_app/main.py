@@ -120,6 +120,12 @@ def get_todo_or_404(todo_id: int):
         raise HTTPException(status_code=404, detail="Todo not found")
     return todo
 
+def pagination(
+        skip: int=Query(default=0,ge=0),
+        limit: int=Query(default=10,gt=0,le=100)
+):
+    return {"skip": skip,"limit": limit}
+
 # ==========================================
 # ROUTES
 # ==========================================
@@ -147,31 +153,41 @@ def create_todo(todo:TodoCreate):
     return{ "message":"todo is created successfully.", "todo":new_todo }
 
 @app.get("/todos")
-def getTodos():
-    return{"total":len(fake_db), "todos":fake_db}
-
-@app.get("/todos/search/")
-def search_todo(
-    status:Optional[Status]=None,
-    priority:Optional[Priority]=None,
-    limit: int=Query(default=10,gt=0,le=100)
-):
-    results=fake_db
-
-    if status is not None:
-        results=[t for t in results if t["status"]==status]
+def get_todos(pages: dict = Depends(pagination)):
     
-    if priority is not None:
-        results=[t for t in results if t['priority']==priority]
+    results = fake_db[pages["skip"] : pages["skip"] + pages["limit"]]
 
-    results=results[:limit]
-
-    return{
-        "total": len(results),
-        "filters":{"status": status,"priority":priority,"limit":limit},
-        "todos":results
+    return {
+        "total": len(fake_db),
+        "skip": pages["skip"],
+        "limit": pages["limit"],
+        "todos": results
     }
 
+
+@app.get("/todos/search/")
+def search_todos(
+    status: Optional[Status] = None,
+    priority: Optional[Priority] = None,
+    pages: dict = Depends(pagination)
+):
+    results = fake_db
+
+    if status is not None:
+        results = [t for t in results if t["status"] == status]
+
+    if priority is not None:
+        results = [t for t in results if t["priority"] == priority]
+
+    # Apply pagination AFTER filtering
+    results = results[pages["skip"] : pages["skip"] + pages["limit"]]
+
+    return {
+        "total": len(results),
+        "skip": pages["skip"],
+        "limit": pages["limit"],
+        "todos": results
+    }
 # ─── These 3 routes now use Dependency Injection ───
 
 @app.get("/todos/{todo_id}")
