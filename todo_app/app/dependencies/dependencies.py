@@ -1,8 +1,8 @@
 from fastapi import Depends, Query
-from sqlmodel import Session, select
-from database import get_session
-from models import Todo
-from exceptions import NotFoundException
+from sqlmodel import Session
+from app.database import get_session
+from app.models.todo import Todo
+from app.exceptions import NotFoundException
 
 
 def get_todo_or_404(

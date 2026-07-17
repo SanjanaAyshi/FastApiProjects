@@ -5,7 +5,7 @@
 
 from pydantic import BaseModel,Field,field_validator,model_validator
 from typing import Optional
-from models import Priority,Status
+from app.models.todo import Priority, Status
 
 class TodoCreate(BaseModel):
     title:str=Field(
